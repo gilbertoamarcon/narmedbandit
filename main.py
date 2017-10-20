@@ -10,11 +10,10 @@ from collections import OrderedDict
 
 NUM_RUNS	= 10000
 NUM_EPOCHS	= 100
-FIG_SIZE	= (9.0, 5.0)
 
 class Agent(object):
 
-	def __init__(self, init_value = 1.0, learning_rate=0.01):
+	def __init__(self, init_value=1.0, learning_rate=0.01):
 		self.values = OrderedDict([
 			('A1', init_value),
 			('A2', init_value),
@@ -29,7 +28,7 @@ class Agent(object):
 			return max(self.values.iteritems(), key=operator.itemgetter(1))[0]
 		return rn.sample(self.values.keys(),1)[0]
 
-	def update(self, action, reward):
+	def update(self, action, reward, epoch):
 		self.values[action] += self.learning_rate*(reward - self.values[action])
 		return self.values
 
@@ -75,16 +74,16 @@ print "Learing... "
 for r in tqdm(range(NUM_RUNS)):
 
 	# Agent Init
-	agent = Agent(init_value=2.0, learning_rate=0.10)
+	agent = Agent(init_value=2.0, learning_rate=0.25)
 
 	# Learning process
 	for e in range(NUM_EPOCHS):
 		# if e < 0.5*NUM_EPOCHS:
 		# 	action = agent.greedy(epsilon=0.5*(1.0+math.cos(2*math.pi*e/NUM_EPOCHS)))
 		# else:
-		action = agent.greedy()
+		action = agent.greedy(epsilon=1.0)
 		reward = nbandit.pull(action)
-		values = agent.update(action=action, reward=reward)
+		values = agent.update(action=action, reward=reward, epoch=e)
 		choices[action][r] += 1
 		data[e]['reward'].append(reward)
 		for v in values:
@@ -106,7 +105,6 @@ for s in tqdm(data):
 
 
 # Values
-plt.figure(figsize=FIG_SIZE)
 plt.subplot2grid((1,4), (0,0), colspan=3)
 plt.title('Rewards and action values')
 plt.xlabel('Epoch')
