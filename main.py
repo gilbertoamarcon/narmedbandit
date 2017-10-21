@@ -8,8 +8,9 @@ import statistics as stat
 from tqdm import tqdm
 from collections import OrderedDict
 
-NUM_RUNS	= 10000
+NUM_RUNS	= 1000
 NUM_EPOCHS	= 100
+E_GREEDY	= False
 
 class Agent(object):
 
@@ -78,10 +79,11 @@ for r in tqdm(range(NUM_RUNS)):
 
 	# Learning process
 	for e in range(NUM_EPOCHS):
-		# if e < 0.5*NUM_EPOCHS:
-		# 	action = agent.greedy(epsilon=0.5*(1.0+math.cos(2*math.pi*e/NUM_EPOCHS)))
-		# else:
-		action = agent.greedy(epsilon=1.0)
+		if E_GREEDY:
+			action = agent.greedy(epsilon=0.10)
+		else:
+			action = agent.greedy(epsilon=0.00)
+
 		reward = nbandit.pull(action)
 		values = agent.update(action=action, reward=reward, epoch=e)
 		choices[action][r] += 1
@@ -109,10 +111,10 @@ plt.subplot2grid((1,4), (0,0), colspan=3)
 plt.title('Rewards and action values')
 plt.xlabel('Epoch')
 plt.ylabel('Value')
-plt.xlim([0, NUM_EPOCHS]) 
+plt.xlim([0, NUM_EPOCHS-1]) 
 plt.tight_layout()
 for k in stats:
-	plt.errorbar(range(NUM_EPOCHS), stats[k][0], yerr=stats[k][1], errorevery=10)
+	plt.errorbar(range(NUM_EPOCHS), stats[k][0], yerr=stats[k][1], errorevery=NUM_EPOCHS/10)
 plt.legend(stats.keys(), loc='best')
 plt.grid(which='major', axis='y')
 
@@ -130,5 +132,7 @@ for k in choices:
 y_pos = np.arange(len(choices))
 plt.bar(y_pos, ameans, yerr=aerror, align='center', ecolor='k')
 plt.xticks(y_pos, choices.keys())
+plt.savefig('plot_%d_%d.eps' % (NUM_EPOCHS, E_GREEDY))
+plt.savefig('plot_%d_%d.png' % (NUM_EPOCHS, E_GREEDY))
 plt.show()
 
