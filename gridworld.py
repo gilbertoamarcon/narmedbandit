@@ -11,7 +11,8 @@ from collections import OrderedDict
 # World parameters
 WWIDTH		= 10
 WHEIGHT		= 5
-NUM_EPOCHS	= 20
+NUM_EPOCHS	= 1000
+NUM_STEPS	= 20
 NOISE		= 0.10
 GOAL		= (9,3)
 AGENT_INIT	= (4,2)
@@ -24,14 +25,15 @@ ACTIONS		= OrderedDict([
 		])
 
 # Learning parameters
-DISCOUNT	= 0.00
-LRATE		= 0.25
-EPSILON_CNT	= 10
-EPSILON_RNG	= [float(i)/EPSILON_CNT for i in range(EPSILON_CNT+1)]
+RANGE_CNT	= 3
+RANGE_RNG	= [0.20 + 0.30*float(i)/RANGE_CNT for i in range(RANGE_CNT+1)]
+EPSILON 	= 0.05
+DISCOUNT	= 0.99
+LRATE		= 0.50
 INIT_VALUE	= 1.0
 
 # Stats parameters
-NUM_RUNS	= 100000
+NUM_RUNS	= 5000
 
 class Agent(object):
 
@@ -52,9 +54,9 @@ class Agent(object):
 			return max(vals.iteritems(), key=operator.itemgetter(1))[0]
 		return rn.sample(vals.keys(),1)[0]
 
-	def update(self, state, action, reward):
+	def update(self, state, action, reward, discount):
 		val = self.values[self.state[1]][self.state[0]][action]
-		target = reward + DISCOUNT*max(self.values[state[1]][state[0]].values())
+		target = reward + discount*max(self.values[state[1]][state[0]].values())
 		delta = self.learning_rate*(target - val)
 		self.values[self.state[1]][self.state[0]][action] += delta
 		self.state = state
@@ -78,17 +80,15 @@ class World(object):
 
 	def pull(self, state, action):
 
+		# Noisy action
+		if rn.random() < self.noise:
+			action = rn.sample(ACTIONS.values(),1)[0]
+
 		# State transition
-		if rn.random() >= self.noise:
-			state = (
-						state[0] + action[0],
-						state[1] + action[1],
-					)
-		else:
-			state = (
-						state[0] + action[0] + rn.randint(-1, 1),
-						state[1] + action[1] + rn.randint(-1, 1),
-					)
+		state = (
+					state[0] + action[0],
+					state[1] + action[1],
+				)
 
 		# World boundaries
 		if state[0] >= WWIDTH:
@@ -110,11 +110,11 @@ class World(object):
 
 world = World(goal=GOAL, noise=NOISE)
 
-stats = OrderedDict([(e, {'mean': [],'stdev': []}) for e in EPSILON_RNG])
+stats = OrderedDict([(e, {'mean': [],'stdev': []}) for e in RANGE_RNG])
 
-for eps in EPSILON_RNG:
+for rng in RANGE_RNG:
 
-	print "Epsilon %3.1f..." % eps
+	print "Range %4.2f..." % rng
 
 	# Reward history
 	data = [[] for i in range(NUM_EPOCHS)]
@@ -123,28 +123,35 @@ for eps in EPSILON_RNG:
 	for r in tqdm(range(NUM_RUNS)):
 
 		# Agent Init
-		agent = Agent(state=AGENT_INIT, init_value=INIT_VALUE, learning_rate=LRATE)
+		agent = Agent(state=AGENT_INIT, init_value=INIT_VALUE, learning_rate=rng)
 
 		# Learning process
 		for e in range(NUM_EPOCHS):
 
-			# Agent takes an action
-			action = agent.greedy(epsilon=eps)
+			# Episode
+			agent.state = AGENT_INIT
+			acc_rwd = 0
+			for s in range(NUM_STEPS):
 
-			# World update
-			state, reward = world.pull(agent.state, action)
+				# Agent takes an action
+				action = agent.greedy(epsilon=EPSILON)
 
-			# Agent learns
-			agent.update(state=state, action=action, reward=reward)
+				# World update
+				state, reward = world.pull(agent.state, action)
+
+				# Agent learns
+				agent.update(state=state, action=action, reward=reward, discount=DISCOUNT)
+
+				acc_rwd += reward/NUM_STEPS
 
 			# Reward history update
-			data[e].append(reward)
+			data[e].append(acc_rwd)
 
 
 	print "Computing stats... "
 	for flt in tqdm([map(float,d) for d in data]):
-		stats[eps]['mean'].append(stat.mean(flt))
-		stats[eps]['stdev'].append(1.96*stat.stdev(flt)/(NUM_RUNS**0.5))
+		stats[rng]['mean'].append(stat.mean(flt))
+		stats[rng]['stdev'].append(1.96*stat.stdev(flt)/(NUM_RUNS**0.5))
 
 # Rewards
 plt.title('Rewards Over Epochs')
@@ -152,10 +159,10 @@ plt.xlabel('Epoch')
 plt.ylabel('Reward')
 plt.xlim([0, NUM_EPOCHS-1]) 
 plt.tight_layout()
-for eps in stats:
-	plt.errorbar(range(NUM_EPOCHS), stats[eps]['mean'], yerr=stats[eps]['stdev'], errorevery=NUM_EPOCHS/10)
-plt.legend(["Epsilon: %3.1f" % e for e in EPSILON_RNG], loc='best')
+for rng in stats:
+	plt.errorbar(range(NUM_EPOCHS), stats[rng]['mean'], yerr=stats[rng]['stdev'], errorevery=NUM_EPOCHS/10)
+plt.legend(["Range: %4.2f" % e for e in RANGE_RNG], loc='best')
 plt.grid(which='major', axis='y')
-plt.savefig('plot_%4.2f.eps' % DISCOUNT)
-plt.savefig('plot_%4.2f.png' % DISCOUNT)
+plt.savefig('plot_%03d.eps' % int(100*DISCOUNT))
+plt.savefig('plot_%03d.png' % int(100*DISCOUNT))
 plt.show()
