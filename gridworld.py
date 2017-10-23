@@ -13,7 +13,7 @@ WWIDTH		= 10
 WHEIGHT		= 5
 NUM_EPOCHS	= 1000
 NUM_STEPS	= 20
-NOISE		= 0.10
+NOISE		= 0.01
 GOAL		= (9,3)
 AGENT_INIT	= (4,2)
 ACTIONS		= OrderedDict([
@@ -25,15 +25,16 @@ ACTIONS		= OrderedDict([
 		])
 
 # Learning parameters
-RANGE_CNT	= 3
-RANGE_RNG	= [0.20 + 0.30*float(i)/RANGE_CNT for i in range(RANGE_CNT+1)]
+# RANGE_CNT	= 5
+# RANGE_RNG	= [0.20 + 0.30*float(i)/RANGE_CNT for i in range(RANGE_CNT+1)]
+RANGE_RNG	= [0.00, 0.01, 0.10]
 EPSILON 	= 0.05
-DISCOUNT	= 0.99
+DISCOUNT	= 0.90
 LRATE		= 0.50
 INIT_VALUE	= 1.0
 
 # Stats parameters
-NUM_RUNS	= 5000
+NUM_RUNS	= 10000
 
 class Agent(object):
 
@@ -108,11 +109,11 @@ class World(object):
 		# Return values
 		return state, reward
 
-world = World(goal=GOAL, noise=NOISE)
-
 stats = OrderedDict([(e, {'mean': [],'stdev': []}) for e in RANGE_RNG])
 
 for rng in RANGE_RNG:
+
+	world = World(goal=GOAL, noise=rng)
 
 	print "Range %4.2f..." % rng
 
@@ -123,7 +124,7 @@ for rng in RANGE_RNG:
 	for r in tqdm(range(NUM_RUNS)):
 
 		# Agent Init
-		agent = Agent(state=AGENT_INIT, init_value=INIT_VALUE, learning_rate=rng)
+		agent = Agent(state=AGENT_INIT, init_value=INIT_VALUE, learning_rate=LRATE)
 
 		# Learning process
 		for e in range(NUM_EPOCHS):
@@ -142,7 +143,7 @@ for rng in RANGE_RNG:
 				# Agent learns
 				agent.update(state=state, action=action, reward=reward, discount=DISCOUNT)
 
-				acc_rwd += reward/NUM_STEPS
+				acc_rwd += reward
 
 			# Reward history update
 			data[e].append(acc_rwd)
@@ -161,7 +162,7 @@ plt.xlim([0, NUM_EPOCHS-1])
 plt.tight_layout()
 for rng in stats:
 	plt.errorbar(range(NUM_EPOCHS), stats[rng]['mean'], yerr=stats[rng]['stdev'], errorevery=NUM_EPOCHS/10)
-plt.legend(["Range: %4.2f" % e for e in RANGE_RNG], loc='best')
+plt.legend(["Noise: %4.2f" % e for e in RANGE_RNG], loc='best')
 plt.grid(which='major', axis='y')
 plt.savefig('plot_%03d.eps' % int(100*DISCOUNT))
 plt.savefig('plot_%03d.png' % int(100*DISCOUNT))
